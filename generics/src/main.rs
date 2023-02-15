@@ -1,3 +1,9 @@
+//! Copyright (c) Liam 2022
+//! All rights reserved. Licensed under MIT.
+//!
+//! The examples in Chapter 10.1
+//! 
+
 // fn largest<T>(list: &[T]) -> &T {
 //     let mut largest = &list[0];
 
