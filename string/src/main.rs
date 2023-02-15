@@ -1,7 +1,7 @@
 //! Copyright (c) Liam 2022
 //! All rights reserved. Licensed under MIT.
-//! 
-//! The examples about strings in Chapter 8.2 
+//!
+//! The examples about strings in Chapter 8.2
 
 fn create_string() {
     /*
