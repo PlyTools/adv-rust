@@ -1,4 +1,4 @@
-//! Copyright (c) Liam 2022
+//! Copyright (c) Liam 2023
 //! All rights reserved. Licensed under MIT.
 //!
 //! The examples about handling recoverable errors in Chapter 9.2
