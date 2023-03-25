@@ -1,7 +1,7 @@
 //! Copyright (c) Liam 2023
 //! All rights reserved under MIT license
 //! 
-//! Examples of channel in Chapter 16.2
+//! Examples of channel in Chapter 16.2 for concurrency by message passing
 
 
 use std::sync::mpsc;
