@@ -1,9 +1,9 @@
 
+mod wallet;
+
 use ethers::core::rand;
 use wallet::Wallet;
 use eyre::Result;
-
-mod wallet;
 
 
 fn main() -> Result<()> {
