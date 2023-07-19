@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package user;
+
+service UserService {
+    rpc SetName (SetNameRequest) returns (SetNameResponse) {};
+    rpc GetName (GetNameRequest) returns (GetNameResponse) {};
+}
+
+message SetNameRequest {
+    string name = 1;
+}
+
+message SetNameResponse {
+    string message = 1;
+}
+
+message GetNameRequest {}
+
+message GetNameResponse {
+    string name = 1;
+}
