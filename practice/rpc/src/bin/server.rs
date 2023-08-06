@@ -1,3 +1,6 @@
+//! Copyright (c) Liam 2023
+//! All rights reserved. License under MIT
+
 extern crate rpc;
 
 use std::sync::Mutex;

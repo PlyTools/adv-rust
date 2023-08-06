@@ -1,3 +1,7 @@
+//! Copyright (c) Liam 2023
+//! All rights reserved. License under MIT
+
+
 extern crate rpc;
 
 use tonic::{transport::Channel, Request, Status};
