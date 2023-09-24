@@ -2,9 +2,7 @@
 //! All rights reserved. License under MIT
 
 
-extern crate rpc;
-
-use tonic::{transport::Channel, Request, Status};
+use tonic::{transport::Channel, Request};
 use rpc::user::user_service_client::UserServiceClient;
 use rpc::user::{SetNameRequest, GetNameRequest};
 

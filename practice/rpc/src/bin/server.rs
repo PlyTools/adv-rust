@@ -1,8 +1,6 @@
 //! Copyright (c) Liam 2023
 //! All rights reserved. License under MIT
 
-extern crate rpc;
-
 use std::sync::Mutex;
 use tonic::{transport::Server, Request, Response, Status};
 use rpc::user::user_service_server::{UserService, UserServiceServer};
