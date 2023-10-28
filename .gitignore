@@ -14,3 +14,11 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# OS template files
+*.DS_Store
+
+# secrets
+*.pem
+*.pk8
+*.key
