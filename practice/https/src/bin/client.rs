@@ -1,5 +1,8 @@
 use hyper::{Body, Client, Request};
-use ring::{rand, signature};
+use ring::{
+    ran::SystemRandom, 
+    signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING},
+    };
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -7,31 +10,26 @@ use std::io::{Read, Write};
 
 fn create_ecdsa_to_file(file_path: &str) -> Result<(), Box<dyn Error>> {
     // Create a ECDSA key pair and save the private code to the privided file_path
-    let rng = rand::SystemRandom::new();
-    let private_key =
-        signature::EcdsaKeyPair::generate_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
-            .expect("failed to generate key pair");
+    let rng = SystemRandom::new();
+    let private_key = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)?;
 
     // Write private key to file
-    File::create(file_path)
-        .expect("private key file not found")
-        .write_all(private_key.as_ref())
-        .expect("failed to write private key file");
+    File::create(file_path)?
+        .write_all(private_key.as_ref())?;
 
     Ok(())
 }
 
-fn load_ecdsa_from_file(file_path: &str) -> Result<signature::EcdsaKeyPair, Box<dyn Error>> {
+fn load_ecdsa_from_file(file_path: &str) -> Result<EcdsaKeyPair, Box<dyn Error>> {
     // Load ECDSA from the private key file
-    let mut file = File::open(file_path).expect("private key file not found");
+    let mut file = File::open(file_path)?;
     let mut key_bytes = Vec::new();
-    file.read_to_end(&mut key_bytes)
-        .expect("failed to read private key file");
+    file.read_to_end(&mut key_bytes)?;
 
-    let key_pair = signature::EcdsaKeyPair::from_pkcs8(
-        &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+    let key_pair = EcdsaKeyPair::from_pkcs8(
+        &ECDSA_P256_SHA256_FIXED_SIGNING,
         key_bytes.as_slice(),
-    ).expect("failed to load key pair");
+    )?;
 
     Ok(key_pair)
 }
