@@ -1,6 +1,6 @@
 use hyper::{Body, Client, Request};
 use ring::{
-    ran::SystemRandom, 
+    rand::SystemRandom, 
     signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING},
     };
 use std::error::Error;
@@ -35,6 +35,7 @@ fn load_ecdsa_from_file(file_path: &str) -> Result<EcdsaKeyPair, Box<dyn Error>>
 }
 
 
+
 #[tokio::main]
 async fn main() {
     let key_file_path = "./private_key.pem";
@@ -51,7 +52,7 @@ async fn main() {
         .unwrap();
 
     // Sign the request
-    let rng = rand::SystemRandom::new();
+    let rng = SystemRandom::new();
     let body_bytes = hyper::body::to_bytes(req.into_body()).await.unwrap();
 
     let signature = key_pair.sign(&rng, body_bytes.as_ref()).unwrap();
@@ -68,4 +69,23 @@ async fn main() {
     let client = Client::new();
     let resp = client.request(req).await.unwrap();
     println!("{:?}", resp);
+}
+
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_create_and_load_ecdsa() {
+        let key_file_path = "./private_key.pem";
+        create_ecdsa_to_file(key_file_path).unwrap();
+
+        let key_file_path = "./private_key.pem";
+        let key_pair = load_ecdsa_from_file(key_file_path).unwrap();
+        println!("{:?}", key_pair);
+    }
+
 }
