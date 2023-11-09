@@ -1,40 +1,47 @@
+use anyhow::{Context, Result};
+use base64;
 use hyper::{Body, Client, Request};
 use ring::{
-    rand::SystemRandom, 
+    rand::SystemRandom,
     signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING},
-    };
-use std::error::Error;
-use std::fs::File;
-use std::io::{Read, Write};
+};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufWriter, Read, Write};
 
-
-fn create_ecdsa_to_file(file_path: &str) -> Result<(), Box<dyn Error>> {
+fn create_ecdsa_to_file(file_path: &str) -> Result<()> {
     // Create a ECDSA key pair and save the private code to the privided file_path
     let rng = SystemRandom::new();
-    let private_key = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)?;
+    let private_key = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
+        .context("Failed to generate ECDSA key pair")?;
 
     // Write private key to file
-    File::create(file_path)?
-        .write_all(private_key.as_ref())?;
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(file_path)
+        .context("Failed to open file for writing")?;
+    let mut writer = BufWriter::new(file);
+    writer
+        .write_all(private_key.as_ref())
+        .context("Failed to write private key to file")?;
 
     Ok(())
 }
 
-fn load_ecdsa_from_file(file_path: &str) -> Result<EcdsaKeyPair, Box<dyn Error>> {
+fn load_ecdsa_from_file(file_path: &str) -> Result<EcdsaKeyPair> {
     // Load ECDSA from the private key file
-    let mut file = File::open(file_path)?;
+    let file = File::open(file_path).context("Failed to open file for reading")?;
+    let mut reader = BufReader::new(file);
     let mut key_bytes = Vec::new();
-    file.read_to_end(&mut key_bytes)?;
+    reader
+        .read_to_end(&mut key_bytes)
+        .context("Failed to read private key from file")?;
 
-    let key_pair = EcdsaKeyPair::from_pkcs8(
-        &ECDSA_P256_SHA256_FIXED_SIGNING,
-        key_bytes.as_slice(),
-    )?;
+    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, key_bytes.as_slice())
+        .context("Failed to create ECDSA key pair from file")?;
 
     Ok(key_pair)
 }
-
-
 
 #[tokio::main]
 async fn main() {
@@ -65,15 +72,10 @@ async fn main() {
         .body(Body::from("Test for identable HTTPS request!"))
         .unwrap();
 
-
     let client = Client::new();
     let resp = client.request(req).await.unwrap();
     println!("{:?}", resp);
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -87,5 +89,4 @@ mod tests {
         let key_pair = load_ecdsa_from_file(key_file_path).unwrap();
         println!("{:?}", key_pair);
     }
-
 }
