@@ -1,4 +1,4 @@
-// Copyright (c) 2023. 
+// Copyright (c) 2023.
 // All rights reserved by Liam Ren
 // This code is licensed under the MIT license.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -11,43 +11,57 @@
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
 
-use hyper::{Server, Body, Request, Response, header, StatusCode};
+use anyhow::{Result, Context};
+use base64;
 use hyper::service::{make_service_fn, service_fn};
-use ring::signature::{self, EcdsaKeyPair, KeyPair, UnparsedPublicKey};
-use std::fs::File;
-use std::io::Read;
-use std::error::Error;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use hyper::{header, Body, Request, Response, Server, StatusCode};
+use ethers::{
+    core::types::{Signature, H160, H256},
+    utils::keccak256,
+};
 
 
-fn load_ecdsa_from_file(file_path: &str) -> Result<EcdsaKeyPair, Box<dyn Error>> {
-    // Load ECDSA from the private key file
-    let mut file = File::open(file_path)?;
-    let mut key_bytes = Vec::new();
-    file.read_to_end(&mut key_bytes)?;
-    let key_pair = EcdsaKeyPair::from_pkcs8(
-        &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-        key_bytes.as_slice(),
-    )?;
-    Ok(key_pair)
+fn recover_address_from_signature(message: &[u8], signature_bytes: &[u8]) -> Result<H160> {
+    // Hash the message with the Ethereum prefix
+    let hashed_msg = keccak256(format!("\x19Ethereum Signed Message:\n{:?}", message));
+
+    // Convert the signature to its r, s, and v components
+    let signature = Signature::try_from(signature_bytes).unwrap();
+
+    // Recover the public key
+    let recovered_public_key = signature.recover(H256::from_slice(&hashed_msg)).unwrap();
+
+    // Derive the Ethereum address from the public key
+    let address = H160::from(H256::from_slice(&keccak256(recovered_public_key.as_bytes())[12..]));
+
+    Ok(address)
 }
 
-async fn handle_request(req: Request<Body>, public_key: Arc<Mutex<UnparsedPublicKey<<EcdsaKeyPair as KeyPair>::PublicKey>>>) -> Result<Response<Body>, hyper::Error> {
+
+async fn handle_request(req: Request<Body>) -> Result<Response<Body>> {
     println!("Request: {:?}", req);
 
     // Verify the signature in the request header
     if let Some(signature_header) = req.headers().get("X-Signature") {
-        let signature = base64::decode(signature_header.as_bytes()).unwrap_or_else(|_| Vec::new());
+        let signature = String::from_utf8(signature_header.as_ref().to_vec())
+            .context("Failed to parse signature header")?;
+        println!("Signature: {}", signature);
         let body_bytes = hyper::body::to_bytes(req.into_body()).await?;
-        // verify the signature by using key_pair
-        let is_verified = public_key.lock().await.verify(&body_bytes, &signature).is_ok();
         
-        let msg = if is_verified {
-            "Signature verified successfully."
-        } else {
-            "Signature verification failed."
+        // Recover the Ethereum address from the signature
+        let mut msg = String::new();
+        match recover_address_from_signature(
+            body_bytes.as_ref(),
+            signature.as_ref(),
+        ) {
+            Ok(address) => {
+                msg.push_str(&format!("Signed by address: {}", address));
+            },
+            Err(e) => {
+                msg.push_str(&format!("Failed to recover address from signature: {}", e));
+            }
         };
+
         Ok(Response::builder()
             .header(header::CONTENT_TYPE, "text/plain")
             .body(msg.into())
@@ -59,24 +73,16 @@ async fn handle_request(req: Request<Body>, public_key: Arc<Mutex<UnparsedPublic
             .body("Missing X-Signature header.".into())
             .unwrap())
     }
-
 }
 
 #[tokio::main]
 async fn main() {
-    let key_file_path = "./private_key.pem";
-    let key_pair = load_ecdsa_from_file(key_file_path).unwrap();
-    let public_key_bytes = key_pair.public_key().clone();
-    let public_key = Arc::new(Mutex::new(
-        UnparsedPublicKey::new(
-            &signature::ECDSA_P256_SHA256_FIXED, 
-            public_key_bytes
-        )
-    ));
-
     let make_svc = make_service_fn(move |_conn| {
-        let public_key = public_key.clone();
-        async move { Ok::<_, hyper::Error>(service_fn(move |req| handle_request(req, public_key.clone()))) }
+        async move {
+            Ok::<_, hyper::Error>(service_fn(move |req| {
+                handle_request(req)
+            }))
+        }
     });
 
     let addr = ([127, 0, 0, 1], 3000).into();

@@ -1,92 +1,79 @@
 use anyhow::{Context, Result};
-use base64;
 use hyper::{Body, Client, Request};
-use ring::{
-    rand::SystemRandom,
-    signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING},
+use ethers::{
+    prelude::*,
+    signers::{coins_bip39::English, MnemonicBuilder},
+    utils::{to_checksum, keccak256},
 };
-use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
 
-fn create_ecdsa_to_file(file_path: &str) -> Result<()> {
-    // Create a ECDSA key pair and save the private code to the privided file_path
-    let rng = SystemRandom::new();
-    let private_key = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
-        .context("Failed to generate ECDSA key pair")?;
 
-    // Write private key to file
-    let file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(file_path)
-        .context("Failed to open file for writing")?;
-    let mut writer = BufWriter::new(file);
-    writer
-        .write_all(private_key.as_ref())
-        .context("Failed to write private key to file")?;
+fn generate_ethereum_account() -> Result<(String, String, LocalWallet)> {
+    // Generate a new Ethereum account
+    let phrase = "work man father plunge mystery proud hollow address reunion sauce theory bonus";
+    let index = 0u32;
+    let password = "TREZOR123";
 
-    Ok(())
+    // Access mnemonic phrase with password
+    // Child key at derivation path: m/44'/60'/0'/0/{index}
+    let wallet = MnemonicBuilder::<English>::default()
+        .phrase(phrase)
+        .index(index)?
+        // Use this if your mnemonic is encrypted
+        .password(password)
+        .build()
+        .context("Failed to generate Ethereum account")?;
+
+    let address = wallet.address();
+
+    Ok((phrase.to_string(), to_checksum(&address, None), wallet))
 }
 
-fn load_ecdsa_from_file(file_path: &str) -> Result<EcdsaKeyPair> {
-    // Load ECDSA from the private key file
-    let file = File::open(file_path).context("Failed to open file for reading")?;
-    let mut reader = BufReader::new(file);
-    let mut key_bytes = Vec::new();
-    reader
-        .read_to_end(&mut key_bytes)
-        .context("Failed to read private key from file")?;
+fn sign_message(wallet: &LocalWallet, message: &[u8]) -> Result<String> {
+    // Hash the message
+    let hashed_msg = keccak256(format!("\x19Ethereum Signed Message:\n{:?}", message));
 
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, key_bytes.as_slice())
-        .context("Failed to create ECDSA key pair from file")?;
+    // Sign the message
+    let signature = wallet.sign_hash(H256::from_slice(&hashed_msg))
+        .context("Failed to sign message")?;
 
-    Ok(key_pair)
+    Ok(signature.to_string())
 }
+
 
 #[tokio::main]
 async fn main() {
-    let key_file_path = "./private_key.pem";
-    create_ecdsa_to_file(key_file_path).unwrap();
-
-    let key_pair = load_ecdsa_from_file(key_file_path).unwrap();
-    println!("{:?}", key_pair);
-
+    let message = "Test for identable HTTPS request!";
+    
     // Create a request
     let req = Request::builder()
         .method("GET")
         .uri("http://127.0.0.1:3000/api")
-        .body(Body::from("Test for identable HTTPS request!"))
+        .body(Body::from(message))
         .unwrap();
 
     // Sign the request
-    let rng = SystemRandom::new();
     let body_bytes = hyper::body::to_bytes(req.into_body()).await.unwrap();
 
-    let signature = key_pair.sign(&rng, body_bytes.as_ref()).unwrap();
+    // Generate a new Ethereum account
+    let (mnemonic_phrase, address, wallet) = generate_ethereum_account().unwrap();
+    println!("Mnemonic phrase: {}", mnemonic_phrase);
+    println!("Address: {}", address);
+
+    let signature = sign_message(&wallet, body_bytes.as_ref()).unwrap();
+    println!("Signature: {}", signature);
 
     // Create a new request with the signature header
     let req = Request::builder()
         .method("GET")
         .uri("http://127.0.0.1:3000/api")
-        .header("X-Signature", base64::encode(signature))
-        .body(Body::from("Test for identable HTTPS request!"))
+        .header("X-Signature", signature)
+        .body(Body::from(message))
         .unwrap();
 
+    // Send the request
     let client = Client::new();
     let resp = client.request(req).await.unwrap();
     println!("{:?}", resp);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_create_and_load_ecdsa() {
-        let key_file_path = "./private_key.pem";
-        create_ecdsa_to_file(key_file_path).unwrap();
 
-        let key_file_path = "./private_key.pem";
-        let key_pair = load_ecdsa_from_file(key_file_path).unwrap();
-        println!("{:?}", key_pair);
-    }
-}
