@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use hyper::{Body, Client, Request};
+use hyper::{Body, Client, Request, body::HttpBody};
 use ethers::{
     prelude::*,
     signers::{coins_bip39::English, MnemonicBuilder},
@@ -30,7 +30,7 @@ fn generate_ethereum_account() -> Result<(String, String, LocalWallet)> {
 
 fn sign_message(wallet: &LocalWallet, message: &[u8]) -> Result<String> {
     // Hash the message
-    let hashed_msg = keccak256(format!("\x19Ethereum Signed Message:\n{:?}", message));
+    let hashed_msg = keccak256(format!("\x19Ethereum Signed Message:\n{}{:?}", message.len(), message));
 
     // Sign the message
     let signature = wallet.sign_hash(H256::from_slice(&hashed_msg))
@@ -74,6 +74,8 @@ async fn main() {
     let client = Client::new();
     let resp = client.request(req).await.unwrap();
     println!("{:?}", resp);
+    let body_bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
+    println!("Response message: {:?}", String::from_utf8(body_bytes.as_ref().to_vec()).unwrap());
 }
 
 
