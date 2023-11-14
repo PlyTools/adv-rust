@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
-use hyper::{Body, Client, Request, body::HttpBody};
+use hyper::{Body, Client, Request};
 use ethers::{
     prelude::*,
     signers::{coins_bip39::English, MnemonicBuilder},
     utils::{to_checksum, keccak256},
 };
-
+use env_logger;
 
 fn generate_ethereum_account() -> Result<(String, String, LocalWallet)> {
     // Generate a new Ethereum account
@@ -42,6 +42,8 @@ fn sign_message(wallet: &LocalWallet, message: &[u8]) -> Result<String> {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let message = "Test for identable HTTPS request!";
     
     // Create a request
@@ -56,11 +58,11 @@ async fn main() {
 
     // Generate a new Ethereum account
     let (mnemonic_phrase, address, wallet) = generate_ethereum_account().unwrap();
-    println!("Mnemonic phrase: {}", mnemonic_phrase);
-    println!("Address: {}", address);
+    log::debug!("Mnemonic phrase: {}", mnemonic_phrase);
+    log::debug!("Address: {}", address);
 
     let signature = sign_message(&wallet, body_bytes.as_ref()).unwrap();
-    println!("Signature: {}", signature);
+    log::debug!("Signature: {}", signature);
 
     // Create a new request with the signature header
     let req = Request::builder()
@@ -73,9 +75,9 @@ async fn main() {
     // Send the request
     let client = Client::new();
     let resp = client.request(req).await.unwrap();
-    println!("{:?}", resp);
+    log::info!("Response: {:?}", resp);
     let body_bytes = hyper::body::to_bytes(resp.into_body()).await.unwrap();
-    println!("Response message: {:?}", String::from_utf8(body_bytes.as_ref().to_vec()).unwrap());
+    log::debug!("Response message: {:?}", String::from_utf8(body_bytes.as_ref().to_vec()).unwrap());
 }
 
 
